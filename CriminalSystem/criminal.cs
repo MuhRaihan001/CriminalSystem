@@ -15,24 +15,20 @@ namespace CriminalSystem
         int bounty;
         int lastBounty;
         Ped BountyHunter;
-        HashSet<int> processedNpcs = new HashSet<int>();
         public criminal()
         {
             GTA.Native.Function.Call(Hash.WAIT, 0);
             Tick += OnTick;
             KeyUp += OnKeyUp;
             KeyDown += OnKeyDown;
-
             bounty = 0;
             lastBounty = 0;
             NotificationIcon icon = new NotificationIcon();
             icon = NotificationIcon.Call911;
-            GTA.UI.Notification.Show(icon, "Government", "TsumuX", "Improvement Criminal Loaded", false, false);
         }
 
         private void OnTick(object sender, EventArgs e)
         {
-            processedNpcs.Clear();
             KillNpc();
             StoleVehicleHandle();
             NpcReaction();
@@ -69,13 +65,14 @@ namespace CriminalSystem
                 Vehicle car = player.CurrentVehicle;
 
                 if(!car.Equals(Game.Player.LastVehicle))
-                {
-
+                { 
                     int increasedBounty = 1000;
                     IncreaseBounty(increasedBounty, "Stole Vehicle");
                 }
             }
         }
+
+        private HashSet<int> countedNpcs = new HashSet<int>();
 
         private void KillNpc()
         {
@@ -85,10 +82,13 @@ namespace CriminalSystem
             Ped[] nearestNpc = World.GetNearbyPeds(playerPos, 30.0f);
             foreach (Ped npc in nearestNpc)
             {
-                if (!processedNpcs.Contains(npc.Handle) && npc.IsDead && npc.Killer == player)
+                int npcId = npc.Handle;
+
+                if (npc.Killer == player && !countedNpcs.Contains(npcId))
                 {
                     IncreaseBounty(5000, "Killing Innocent People");
-                    processedNpcs.Add(npc.Handle);
+                    countedNpcs.Add(npcId);
+                    break;
                 }
             }
         }
@@ -97,6 +97,7 @@ namespace CriminalSystem
         {
             Ped player = Game.Player.Character;
             Vector3 Pos = player.Position;
+            
             Ped[] nearbyNPCs = World.GetNearbyPeds(Pos, 30.0f);
             if(bounty >= 100000)
             {
@@ -105,8 +106,10 @@ namespace CriminalSystem
                     float distance = World.GetDistance(Pos, npc.Position);
                     if (distance < 30.0f)
                     {
-                        if (!npc.IsInVehicle() && !npc.IsPlayer && npc != BountyHunter)
+                        if (!npc.IsPlayer && npc != BountyHunter)
                         {
+                            npc.Task.ClearAll();
+                            Function.Call(Hash.TASK_START_SCENARIO_IN_PLACE, npc.Handle, "WORLD_HUMAN_MOBILE_FILM_SHOCKING", 0, true);
                             npc.Task.ReactAndFlee(player);
                             Function.Call(Hash.SET_PLAYER_WANTED_LEVEL_NOW, Game.Player.Handle, 4);
                         }
