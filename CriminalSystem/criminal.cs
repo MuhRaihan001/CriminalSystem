@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Windows.Forms;
 using GTA;
@@ -13,6 +14,8 @@ namespace CriminalSystem
     {
         int bounty;
         int lastBounty;
+        Ped BountyHunter;
+        HashSet<int> processedNpcs = new HashSet<int>();
         public criminal()
         {
             GTA.Native.Function.Call(Hash.WAIT, 0);
@@ -29,7 +32,7 @@ namespace CriminalSystem
 
         private void OnTick(object sender, EventArgs e)
         {
-            
+            processedNpcs.Clear();
             KillNpc();
             StoleVehicleHandle();
             NpcReaction();
@@ -77,22 +80,15 @@ namespace CriminalSystem
         private void KillNpc()
         {
             Ped player = Game.Player.Character;
+            Vector3 playerPos = player.Position;
 
-            if (player.IsAiming && Function.Call<bool>(Hash.IS_PLAYER_FREE_AIMING_AT_ENTITY, player, -1))
+            Ped[] nearestNpc = World.GetNearbyPeds(playerPos, 30.0f);
+            foreach (Ped npc in nearestNpc)
             {
-                Entity targetEntity = Function.Call<Entity>(Hash.GET_ENTITY_PLAYER_IS_FREE_AIMING_AT, player);
-
-                if (targetEntity != null && targetEntity.Exists() && targetEntity.GetType() == typeof(Ped))
+                if (!processedNpcs.Contains(npc.Handle) && npc.IsDead && npc.Killer == player)
                 {
-                    Ped targetPed = (Ped)targetEntity;
-
-                    if (targetPed.IsDead)
-                    {
-                        Console.WriteLine("Npc Died");
-                        int increasedBounty = 5000;
-                        IncreaseBounty(increasedBounty, "Killing People");
-
-                    }
+                    IncreaseBounty(5000, "Killing Innocent People");
+                    processedNpcs.Add(npc.Handle);
                 }
             }
         }
@@ -100,7 +96,6 @@ namespace CriminalSystem
         private void NpcReaction()
         {
             Ped player = Game.Player.Character;
-            bool bountyHunterSpawnned = false;
             Vector3 Pos = player.Position;
             Ped[] nearbyNPCs = World.GetNearbyPeds(Pos, 30.0f);
             if(bounty >= 100000)
@@ -110,18 +105,12 @@ namespace CriminalSystem
                     float distance = World.GetDistance(Pos, npc.Position);
                     if (distance < 30.0f)
                     {
-                        if (!npc.IsInVehicle() && !npc.IsPlayer)
+                        if (!npc.IsInVehicle() && !npc.IsPlayer && npc != BountyHunter)
                         {
-                            npc.Task.ClearAll();
                             npc.Task.ReactAndFlee(player);
                             Function.Call(Hash.SET_PLAYER_WANTED_LEVEL_NOW, Game.Player.Handle, 4);
                         }
                     }
-                }
-                if(!bountyHunterSpawnned)
-                {
-                    SpawnBountyHunter();
-                    bountyHunterSpawnned= true;
                 }
                 
             }
@@ -133,7 +122,7 @@ namespace CriminalSystem
             Vector3 playerPos = Game.Player.Character.Position;
             Vector3 BountyHunterPos = playerPos.Around(1.0f);
 
-            Ped BountyHunter = World.CreatePed(PedHash.Bankman, BountyHunterPos);
+            BountyHunter = World.CreatePed(PedHash.Bankman, BountyHunterPos);
             Console.WriteLine("Bounty Hunter Created To Chase You");
             if(bounty <= 5000)
             {
