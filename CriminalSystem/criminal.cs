@@ -172,7 +172,7 @@ namespace CriminalSystem
             string bountyHunterName = GetRandomString();
             NotificationIcon icon = new NotificationIcon();
             icon = NotificationIcon.Blocked;
-            GTA.UI.Notification.Show(icon, bountyHunterName, $"Hello The {Rank} {Game.Player.Name}", $"Hello {Game.Player.Name}. don't try to run from me. lest have some fun before i take your head to police", false, false);
+            GTA.UI.Notification.Show(icon, bountyHunterName, $"Hello {Game.Player.Name}", $"Hello The {Rank}. don't try to run from me. lest have some fun before i take your head to police", false, false);
             if (bounty <= 5000)
             {
                 if(!BountyHunter.Weapons.HasWeapon(WeaponHash.Knife))
