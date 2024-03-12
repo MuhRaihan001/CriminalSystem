@@ -13,7 +13,7 @@ The Criminal Improvement Wanted System Mod is a modification for the Grand Theft
 
 ### 2. Law Enforcement and Npc Reactions
 
-- **Npc Reactions:** As the bounty increases, nearby NPCs react to the player's presence, fleeing or displaying shocked behaviors.
+- **Npc Reactions:** As the bounty increases, nearby NPCs react to the player's presence, fleeing or displaying shocked behaviors. But some npc doesn't know your identity as criminal, so they just igrone you
 - **Police Response:** A significant bounty triggers an immediate increase in the player's wanted level, attracting law enforcement attention.
 
 ### 3. Bounty Hunter System
