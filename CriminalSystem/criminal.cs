@@ -19,19 +19,28 @@ namespace CriminalSystem
         private TimeSpan bountyHunterSpawnInterval = TimeSpan.FromMinutes(5);
         private bool isWanted = false;
         private bool wantedLevelSet = false;
+        private bool MostWanted = false;
+        private DateTime LastWanted;
+        private TimeSpan DeleteMostWanted = TimeSpan.FromMinutes(5);
+
         public criminal()
         {
             GTA.Native.Function.Call(Hash.WAIT, 0);
             Tick += OnTick;
             KeyUp += OnKeyUp;
             KeyDown += OnKeyDown;
+
             bounty = 0;
             lastBounty = 0;
+            LastWanted = DateTime.Now;
             lastBountyHunterSpawnTime = DateTime.Now;
         }
 
         private void OnTick(object sender, EventArgs e)
         {
+            TimeSpan elapsed = DateTime.Now - lastBountyHunterSpawnTime;
+            TimeSpan countdown = DateTime.Now - LastWanted;
+
             KillNpc();
             StoleVehicleHandle();
             NpcReaction();
@@ -49,11 +58,15 @@ namespace CriminalSystem
                 bounty = 0;
             }
 
-            TimeSpan elapsed = DateTime.Now - lastBountyHunterSpawnTime;
             if (elapsed >= bountyHunterSpawnInterval)
             {
                 SpawnBountyHunter();
                 lastBountyHunterSpawnTime = DateTime.Now;
+            }
+            if (countdown >= DeleteMostWanted)
+            {
+                MostWanted = false;
+                LastWanted = DateTime.Now;
             }
         }
         private void IncreaseBounty(int value, string reason)
@@ -102,9 +115,9 @@ namespace CriminalSystem
             {
                 int npcId = npc.Handle;
 
-                if (npc.Killer == player && !countedNpcs.Contains(npcId) && npc != BountyHunter && !npc.IsInCombatAgainst(player))
+                if (npc.Killer == player && !countedNpcs.Contains(npcId) && npc != BountyHunter && !npc.IsInCombatAgainst(player) && player.Weapons.Current != WeaponHash.Unarmed)
                 {
-                    IncreaseBounty(50, "Killing Innocent People");
+                    IncreaseBounty(20, "Killing Innocent People");
                     countedNpcs.Add(npcId);
                     break;
                 }
@@ -126,11 +139,14 @@ namespace CriminalSystem
                     {
                         if (!npc.IsPlayer && npc != BountyHunter && !npc.IsInCombatAgainst(player) && !player.IsInVehicle())
                         {
-                            npc.Task.ClearAll();
-                            Function.Call(Hash.TASK_START_SCENARIO_IN_PLACE, npc.Handle, "WORLD_HUMAN_MOBILE_FILM_SHOCKING", 0, true);
-                            npc.Task.ReactAndFlee(player);
-                            Function.Call(Hash.SET_PLAYER_WANTED_LEVEL_NOW, Game.Player.Handle, 4);
-                            wantedLevelSet = true;
+                            if (npc.IsHuman)
+                            {
+                                npc.Task.ClearAll();
+                                Function.Call(Hash.TASK_START_SCENARIO_IN_PLACE, npc.Handle, "WORLD_HUMAN_MOBILE_FILM_SHOCKING", 0, true);
+                                npc.Task.ReactAndFlee(player);
+                                Function.Call(Hash.SET_PLAYER_WANTED_LEVEL_NOW, Game.Player.Handle, 4);
+                                wantedLevelSet = true;
+                            }
                         }
                     }
                 }
@@ -175,60 +191,76 @@ namespace CriminalSystem
             string Rank = GetRank(bounty);
             if (bounty < 200)
                 return;
-            
-            BountyHunter = World.CreatePed(PedHash.Bankman, BountyHunterPos);
-            Console.WriteLine("Bounty Hunter Created To Chase You");
-            string bountyHunterName = GetRandomString();
-            NotificationIcon icon = new NotificationIcon();
-            icon = NotificationIcon.Blocked;
-            GTA.UI.Notification.Show(icon, bountyHunterName, $"Hello {Game.Player.Name}", $"Hello The {Rank}. don't try to run from me. lest have some fun before i take your head to police", false, false);
-            if (bounty <= 5000)
+            if(MostWanted)
             {
-                if(!BountyHunter.Weapons.HasWeapon(WeaponHash.Knife))
+                int amount = new Random().Next(2, 5);
+                for(int i = 0; i < amount; i++)
                 {
-                    BountyHunter.Weapons.Give(WeaponHash.Knife, 100, true, true);
+                    BountyHunter = World.CreatePed(PedHash.Bankman, BountyHunterPos);
                 }
+                NotificationIcon icon = new NotificationIcon();
+                icon = NotificationIcon.Blocked;
+                GTA.UI.Notification.Show(icon, "Bounty Hunter Group", $"Hello {Game.Player.Name}", $"Hello The {Rank}. We Heard The {Rank} Have A high Bounty. So We Team Up To Catch You And Get The Money From Your Head. It Will Be {amount} People Will Against You", false, false);
             }
-            else if(bounty >= 5000 && bounty < 10000)
+            else
             {
-                if(!BountyHunter.Weapons.HasWeapon(WeaponHash.Pistol))
-                {
-                    BountyHunter.Weapons.Give(WeaponHash.Pistol, 100, true, true);
-                }
+                BountyHunter = World.CreatePed(PedHash.Bankman, BountyHunterPos);
+                Console.WriteLine("Bounty Hunter Created To Chase You");
+                string bountyHunterName = GetRandomString();
+                NotificationIcon icon = new NotificationIcon();
+                icon = NotificationIcon.Blocked;
+                GTA.UI.Notification.Show(icon, bountyHunterName, $"Hello {Game.Player.Name}", $"Hello The {Rank}. don't try to run from me. lest have some fun before i take your head to police", false, false);
             }
-            else if(bounty >= 10000)
-            {
-                if(!BountyHunter.Weapons.HasWeapon(WeaponHash.HeavyShotgun))
-                {
-                    BountyHunter.Weapons.Give(WeaponHash.HeavyShotgun, 100, true, true);
-                }
-            }
-
-            BountyHunter.Armor = 100;
+            GiveBountyHunterWeapon();
             BountyHunter.Health = 500;
             BountyHunter.Task.FightAgainst(Game.Player.Character);
             
         }
 
+        private void GiveBountyHunterWeapon()
+        {
+            if (bounty <= 5000)
+            {
+                if (!BountyHunter.Weapons.HasWeapon(WeaponHash.Knife))
+                {
+                    BountyHunter.Weapons.Give(WeaponHash.Knife, 100, true, true);
+                }
+            }
+            else if (bounty >= 5000 && bounty < 10000)
+            {
+                if (!BountyHunter.Weapons.HasWeapon(WeaponHash.Pistol))
+                {
+                    BountyHunter.Weapons.Give(WeaponHash.Pistol, 100, true, true);
+                }
+            }
+            else if (bounty >= 10000)
+            {
+                if (!BountyHunter.Weapons.HasWeapon(WeaponHash.HeavyShotgun))
+                {
+                    BountyHunter.Weapons.Give(WeaponHash.HeavyShotgun, 100, true, true);
+                }
+            }
+        }
+
         public string GetRank(decimal bounty)
         {
-            if (bounty < 1000)
+            if (bounty < 1500)
             {
                 return "Punk";
             }
-            else if (bounty < 2000)
+            else if (bounty < 5000)
             {
                 return "Gangster Class";
             }
-            else if (bounty < 5000)
+            else if (bounty < 10000)
             {
                 return "Mafia Class";
             }
-            else if (bounty < 100000)
+            else if (bounty < 200000)
             {
                 return "Hitman Class";
             }
-            else if (bounty < 150000)
+            else if (bounty < 250000)
             {
                 return "Underground Mob";
             }
@@ -261,6 +293,7 @@ namespace CriminalSystem
             {
                 isWanted = false;
                 IncreaseBounty(5000, "Most Wanted Person");
+                MostWanted = true;
             }
 
             if(Game.Player.IsDead || Function.Call<bool>(Hash.IS_PLAYER_BEING_ARRESTED, Game.Player.Handle, true))
