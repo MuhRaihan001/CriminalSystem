@@ -1,11 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Windows.Forms;
 using GTA;
 using GTA.Math;
 using GTA.Native;
-using GTA.NaturalMotion;
 using GTA.UI;
 
 namespace CriminalSystem
@@ -17,6 +17,8 @@ namespace CriminalSystem
         Ped BountyHunter;
         private DateTime lastBountyHunterSpawnTime;
         private TimeSpan bountyHunterSpawnInterval = TimeSpan.FromMinutes(5);
+        private bool isWanted = false;
+        private bool wantedLevelSet = false;
         public criminal()
         {
             GTA.Native.Function.Call(Hash.WAIT, 0);
@@ -33,18 +35,14 @@ namespace CriminalSystem
             KillNpc();
             StoleVehicleHandle();
             NpcReaction();
+            IsPlayerLooseCops();
 
-            if (Function.Call<int>(Hash.GET_PLAYER_WANTED_LEVEL, Game.Player.Handle) == 0 && lastBounty > 0)
-            {
-                IncreaseBounty(1000, "The Most Wanted");
-            }
-
-                if (Function.Call<bool>(Hash.IS_PLAYER_BEING_ARRESTED, Game.Player.Handle, true))
+            if (Function.Call<bool>(Hash.IS_PLAYER_BEING_ARRESTED, Game.Player.Handle, true))
             {
                 lastBounty = bounty;
                 bounty = 0;
             }
-            else if (Function.Call<bool>(Hash.IS_PLAYER_DEAD, Game.Player.Handle, true))
+            else if (Game.Player.IsDead)
             {
                 lastBounty = bounty;
                 Game.Player.Money -= bounty;
@@ -132,10 +130,19 @@ namespace CriminalSystem
                             Function.Call(Hash.TASK_START_SCENARIO_IN_PLACE, npc.Handle, "WORLD_HUMAN_MOBILE_FILM_SHOCKING", 0, true);
                             npc.Task.ReactAndFlee(player);
                             Function.Call(Hash.SET_PLAYER_WANTED_LEVEL_NOW, Game.Player.Handle, 4);
+                            wantedLevelSet = true;
                         }
                     }
                 }
-                Function.Call(Hash.SET_PLAYER_WANTED_LEVEL_NOW, player.Handle, 3);
+                if (!wantedLevelSet)
+                {
+                    Game.Player.WantedLevel = 3;
+                    wantedLevelSet = true;
+                }
+            }
+            else if (Game.Player.WantedLevel == 0 && wantedLevelSet)
+            {
+                wantedLevelSet = false;
             }
         }
 
@@ -166,7 +173,9 @@ namespace CriminalSystem
             Vector3 BountyHunterPos = playerPos.Around(50.0f);
 
             string Rank = GetRank(bounty);
-
+            if (bounty < 200)
+                return;
+            
             BountyHunter = World.CreatePed(PedHash.Bankman, BountyHunterPos);
             Console.WriteLine("Bounty Hunter Created To Chase You");
             string bountyHunterName = GetRandomString();
@@ -240,6 +249,24 @@ namespace CriminalSystem
                 return "Underground Emperor";
             }
             return "Unknown Rank";
+        }
+
+        private void IsPlayerLooseCops()
+        {
+            if(Game.Player.WantedLevel > 0)
+            {
+                isWanted = true;
+            }
+            else if(Game.Player.WantedLevel < 1 && isWanted)
+            {
+                isWanted = false;
+                IncreaseBounty(5000, "Most Wanted Person");
+            }
+
+            if(Game.Player.IsDead || Function.Call<bool>(Hash.IS_PLAYER_BEING_ARRESTED, Game.Player.Handle, true))
+            {
+                isWanted = false;
+            }
         }
 
         private void OnKeyDown(object sender, KeyEventArgs e)
