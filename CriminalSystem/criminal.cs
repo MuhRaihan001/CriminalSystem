@@ -12,9 +12,9 @@ namespace CriminalSystem
 {
     public class criminal : Script
     {
-        int bounty;
-        int lastBounty;
-        Ped BountyHunter;
+        private int bounty = 0;
+        private int lastBounty;
+        private Ped BountyHunter;
         private DateTime lastBountyHunterSpawnTime;
         private TimeSpan bountyHunterSpawnInterval = TimeSpan.FromMinutes(5);
         private bool isWanted = false;
@@ -22,6 +22,7 @@ namespace CriminalSystem
         private bool MostWanted = false;
         private DateTime LastWanted;
         private TimeSpan DeleteMostWanted = TimeSpan.FromMinutes(5);
+        private bool IsDisguise = false;
 
         public criminal()
         {
@@ -30,7 +31,6 @@ namespace CriminalSystem
             KeyUp += OnKeyUp;
             KeyDown += OnKeyDown;
 
-            bounty = 0;
             lastBounty = 0;
             LastWanted = DateTime.Now;
             lastBountyHunterSpawnTime = DateTime.Now;
@@ -45,6 +45,7 @@ namespace CriminalSystem
             StoleVehicleHandle();
             NpcReaction();
             IsPlayerLooseCops();
+            DisguiseHandle();
 
             if (Function.Call<bool>(Hash.IS_PLAYER_BEING_ARRESTED, Game.Player.Handle, true))
             {
@@ -111,6 +112,9 @@ namespace CriminalSystem
             Vector3 playerPos = player.Position;
 
             Ped[] nearestNpc = World.GetNearbyPeds(playerPos, 100.0f);
+            if(IsDisguise)
+                IsDisguise = false;
+
             foreach (Ped npc in nearestNpc)
             {
                 int npcId = npc.Handle;
@@ -137,14 +141,13 @@ namespace CriminalSystem
                     float distance = World.GetDistance(Pos, npc.Position);
                     if (distance < 10.0f)
                     {
-                        if (!npc.IsPlayer && npc != BountyHunter && !npc.IsInCombatAgainst(player) && !player.IsInVehicle())
+                        if (!npc.IsPlayer && npc != BountyHunter && !npc.IsInCombatAgainst(player) && !player.IsInVehicle() && IsDisguise)
                         {
                             if (npc.IsHuman)
                             {
                                 npc.Task.ClearAll();
                                 Function.Call(Hash.TASK_START_SCENARIO_IN_PLACE, npc.Handle, "WORLD_HUMAN_MOBILE_FILM_SHOCKING", 0, true);
                                 npc.Task.ReactAndFlee(player);
-                                Function.Call(Hash.SET_PLAYER_WANTED_LEVEL_NOW, Game.Player.Handle, 4);
                                 wantedLevelSet = true;
                             }
                         }
@@ -191,6 +194,9 @@ namespace CriminalSystem
             string Rank = GetRank(bounty);
             if (bounty < 200)
                 return;
+            if (IsDisguise)
+                return;
+
             if(MostWanted)
             {
                 int amount = new Random().Next(2, 5);
@@ -299,6 +305,19 @@ namespace CriminalSystem
             if(Game.Player.IsDead || Function.Call<bool>(Hash.IS_PLAYER_BEING_ARRESTED, Game.Player.Handle, true))
             {
                 isWanted = false;
+            }
+        }
+
+        private void DisguiseHandle()
+        {
+            Ped player = Game.Player.Character;
+            if(player.IsWearingHelmet)
+            {
+                IsDisguise = true;
+            }
+            else
+            {
+                IsDisguise = false;
             }
         }
 
